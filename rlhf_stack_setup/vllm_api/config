@@ -1,0 +1,2 @@
+# vLLM configuration file
+# This will be used for serving the LLM model via OpenAI-compatible API

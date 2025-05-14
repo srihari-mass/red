@@ -1,0 +1,72 @@
+
+version: '3.9'
+services:
+  vllm_api:
+    image: vllm/vllm-openai:v0.3.2
+    ports:
+      - "8000:8000"
+    environment:
+      MODEL_NAME: deepseek-ai/DeepSeek-R1-Distill-Qwen-14B
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    command: ["--model", "deepseek-ai/DeepSeek-R1-Distill-Qwen-14B", "--dtype", "bfloat16", "--port", "8000"]
+
+  streamlit_ui:
+    build: ./feedback_ui
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./feedback_ui:/app
+    depends_on:
+      - vllm_api
+
+  label_studio:
+    image: heartexlabs/label-studio:latest
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./label_studio:/label-studio/data
+    environment:
+      - LABEL_STUDIO_USERNAME=admin
+      - LABEL_STUDIO_PASSWORD=admin
+
+  reward_model:
+    build: ./reward_model
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    volumes:
+      - ./reward_model:/app
+
+  ppo_trainer:
+    build: ./ppo_trainer
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    volumes:
+      - ./ppo_trainer:/app
+    depends_on:
+      - reward_model
+
+  aim:
+    image: aimstack/aim
+    ports:
+      - "43800:43800"
+    volumes:
+      - ./aim_repo:/repo
+    environment:
+      - AIM_UI_USERNAME=admin
+      - AIM_UI_PASSWORD=admin
